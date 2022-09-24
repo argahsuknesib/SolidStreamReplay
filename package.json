@@ -1,0 +1,25 @@
+{
+  "name": "solidstreamreplay",
+  "version": "1.0.0",
+  "description": "A library to replay stream logs which are stored in a solid pod. ",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/argahsuknesib/SolidStreamReplay.git"
+  },
+  "author": "Kushagra Singh Bisen and Tom Windels",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/argahsuknesib/SolidStreamReplay/issues"
+  },
+  "homepage": "https://github.com/argahsuknesib/SolidStreamReplay#readme",
+  "devDependencies": {
+    "@comunica/query-sparql": "^2.4.3",
+    "@treecg/actor-init-typeahead": "^1.21.5",
+    "typescript": "^4.8.3"
+  }
+}
