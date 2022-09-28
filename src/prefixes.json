@@ -1,0 +1,67 @@
+{
+    "prefixes": [
+        {
+            "name": "ldes:",
+            "value": "https://w3id.org/ldes#"
+        },
+        {
+            "name": "ldp:",
+            "value": "http://www.w3.org/ns/ldp#"
+        },
+        {
+            "name": "sosa:",
+            "value": "http://www.w3.org/ns/sosa/"
+        },
+        {
+            "name": "xsd:",
+            "value": "http://www.w3.org/2001/XMLSchema#"
+        },
+        {
+            "name": "rdf:",
+            "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+        },
+        {
+            "name": "rdfs:",
+            "value": "http://www.w3.org/2000/01/rdf-schema#"
+        },
+        {
+            "name": "tree:",
+            "value": "https://w3id.org/tree#"
+        },
+        {
+            "name": "hydra:",
+            "value": "http://www.w3.org/ns/hydra/core#"
+        },
+        {
+            "name": "saref:",
+            "value": "https://saref.etsi.org/core/",
+            "sorting": "hasTimestamp",
+            "special": {
+                "hasTimestamp": {
+                    "function": "timestamp",
+                    "format": "ISO8601"
+                },
+                "hasValue": {
+                    "function": "data",
+                    "format": "number"
+                }
+            }
+        },
+        {
+            "name": "void:",
+            "value": "http://rdfs.org/ns/void#"
+        },
+        {
+            "name": "owl:",
+            "value": "http://www.w3.org/2002/07/owl#"
+        },
+        {
+            "name": "dcterms:",
+            "value": "http://purl.org/dc/terms/"
+        },
+        {
+            "name": "foaf:",
+            "value": "http://xmlns.com/foaf/0.1/"
+        }
+    ]
+}
