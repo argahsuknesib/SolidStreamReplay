@@ -1,42 +1,47 @@
 {
-    "prefixes": [
-        {
-            "name": "ldes:",
-            "value": "https://w3id.org/ldes#"
+    "prefixes": {
+        "ldes:": {
+            "value": "https://w3id.org/ldes#",
+            "objects": {}
         },
-        {
-            "name": "ldp:",
-            "value": "http://www.w3.org/ns/ldp#"
+        "ldp:":{
+            "value": "http://www.w3.org/ns/ldp#",
+            "objects": {
+                "container": ["Container", "BasicContainer"], 
+                "element": "Resource",
+                "inbox": "inbox"
+            }
         },
-        {
-            "name": "sosa:",
-            "value": "http://www.w3.org/ns/sosa/"
+        "sosa:": {
+            "value": "http://www.w3.org/ns/sosa/",
+            "objects": {}
         },
-        {
-            "name": "xsd:",
-            "value": "http://www.w3.org/2001/XMLSchema#"
+        "xsd:": {
+            "value": "http://www.w3.org/2001/XMLSchema#",
+            "objects": {}
         },
-        {
-            "name": "rdf:",
-            "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+        "rdf:": {
+            "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "objects": {}
         },
-        {
-            "name": "rdfs:",
-            "value": "http://www.w3.org/2000/01/rdf-schema#"
+        "rdfs:": {
+            "value": "http://www.w3.org/2000/01/rdf-schema#",
+            "objects": {}
         },
-        {
-            "name": "tree:",
-            "value": "https://w3id.org/tree#"
+        "tree:": {
+            "value": "https://w3id.org/tree#",
+            "objects": {
+                "node": "Node"
+            }
         },
-        {
-            "name": "hydra:",
-            "value": "http://www.w3.org/ns/hydra/core#"
+        "hydra:": {
+            "value": "http://www.w3.org/ns/hydra/core#",
+            "objects": {}
         },
-        {
-            "name": "saref:",
+        "saref:": {
             "value": "https://saref.etsi.org/core/",
             "sorting": "hasTimestamp",
-            "special": {
+            "predicates": {
                 "hasTimestamp": {
                     "function": "timestamp",
                     "format": "ISO8601"
@@ -45,23 +50,28 @@
                     "function": "data",
                     "format": "number"
                 }
-            }
+            },
+            "objects": {}
         },
-        {
-            "name": "void:",
-            "value": "http://rdfs.org/ns/void#"
+        "void:": {
+            "value": "http://rdfs.org/ns/void#",
+            "objects": {}
         },
-        {
-            "name": "owl:",
-            "value": "http://www.w3.org/2002/07/owl#"
+        "owl:": {
+            "value": "http://www.w3.org/2002/07/owl#",
+            "objects": {}
         },
-        {
-            "name": "dcterms:",
-            "value": "http://purl.org/dc/terms/"
+        "dcterms:": {
+            "value": "http://purl.org/dc/terms/",
+            "objects": {}
         },
-        {
-            "name": "foaf:",
-            "value": "http://xmlns.com/foaf/0.1/"
+        "foaf:": {
+            "value": "http://xmlns.com/foaf/0.1/",
+            "objects": {}
+        },
+        "<unknown>": {
+            "value": "<unavailable>",
+            "objects": {}
         }
-    ]
+    }
 }

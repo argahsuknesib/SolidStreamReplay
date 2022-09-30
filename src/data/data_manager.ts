@@ -1,5 +1,5 @@
 import { DataQueryArguments } from "../util/data_query_arguments";
-import { TripleEntry, DataEntry } from "../util/triple";
+import { TripleEntry, SimpleDataEntry } from "../util/triple";
 import { DataSource } from "./data_source";
 
 export class DataManager {
@@ -8,13 +8,13 @@ export class DataManager {
 
     static __data_location_lut = new Map<string, DataManager>();
 
-    private constructor(remote_location: string) {
-        this.source = new DataSource(remote_location);
+    private constructor(remote_location: string, type: "remote" | "local") {
+        this.source = new DataSource(remote_location, type);
         // the creation of the source automatically fetches data
     }
 
-    static async addLocation(location: string) {
-        DataManager.__data_location_lut.set(location, new DataManager(location));
+    static async addLocation(location: string, type: "remote" | "local") {
+        DataManager.__data_location_lut.set(location, new DataManager(location, type));
     }
 
     static hasLocation(location: string) : boolean {
@@ -58,26 +58,29 @@ export class DataManager {
             console.log("Sorting required but not available")
             result["@warning"] = { "NotSortable": "Requested data type does not allow sorting, which makes filtering using start-stop not possible" };
         }
-        let subbuffer : DataEntry[] = databuffer.slice(startIndex, endIndex + 1);
+        let subbuffer : SimpleDataEntry[] = databuffer.slice(startIndex, endIndex + 1);
         // other filters are applied here (matching subj/pred/...)
         if (args.subj) {
             // every subject gets mapped to a triple entry version
             // so the checks work regardless of notation used in
             // the argument
             const subjects = args.subj.map((original: string) => TripleEntry.from_any(original));
-            subbuffer = subbuffer.filter((data: DataEntry) => {
+            subbuffer = subbuffer.filter((data: SimpleDataEntry) => {
                 return subjects.some((subject: TripleEntry) => data.subj.equals(subject));
             });
         }
         if (args.pred) {
+            // TODO: apply the predicate filter on only one sample, so predicate indices
+            // are obtained instead, and using those indices as the filters instead
+
             // here, entries are kept, but their properties
             // are filtered upon
             // the new data entries do not get their sorting
             // index set, as this is no longer required (source array
             // is already sorted)
             const predicates = args.pred.map((original: string) => TripleEntry.from_any(original));
-            subbuffer = subbuffer.map((data: DataEntry) => {
-                return new DataEntry(
+            subbuffer = subbuffer.map((data: SimpleDataEntry) => {
+                return new SimpleDataEntry(
                     data.subj,
                     data.props.filter(
                         ([prop, _]) => predicates.some(

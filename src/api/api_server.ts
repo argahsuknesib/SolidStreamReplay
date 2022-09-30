@@ -14,25 +14,26 @@ export class APIServer {
             res.json({"empty": "Nothing implemented here yet"});
         });
 
-        app.get("/:loc_base64/info", (req, res) => {
+        app.get("/:loc/info", (req, res) => {
             // TODO show stats, such as available number of datapoints,
             // predicates, sortable or not, if constant timestep - its frequency/dt,
             // outer timestamps available, ...
             // TODO this query should also add it as a source, just like DataResponse
             // does internally
-            const location = getRemotePath(req.params.loc_base64);
+            const location = getRemotePath(req.params.loc);
             res.json(location);
         });
         
-        app.get("/:loc_base64/get", async (req, res, next) => {
-            const location = getRemotePath(req.params.loc_base64);
-            if (location) {
+        app.get("/:loc/get", async (req, res, next) => {
+            // TODO: maybe set headers for optimisation (e.g. compression, caching, ...)
+            const [location, type] = getRemotePath(req.params.loc);
+            if (type !== "invalid") {
                 res.json(
-                    new DataResponse(location, DataQueryArguments.from(req.query)).data
+                    new DataResponse(location, type, DataQueryArguments.from(req.query)).data
                 );
                 next();
             } else {
-                res.json(DataResponse.empty);
+                res.json(DataResponse.invalid(location));
             }
         });
         

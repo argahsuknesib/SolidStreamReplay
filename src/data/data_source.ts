@@ -1,7 +1,9 @@
-import { TripleEntry, Triple } from "../util/triple";
-import { DataEntry } from "../util/triple";
+import { TripleEntry, Triple, DataEntry } from "../util/triple";
+import { SimpleDataEntry } from "../util/triple";
 import { prefixes } from "../prefixes.json";
 import { assert } from "console";
+import { anyIsObject, isObject, object } from "../util/prefix_util";
+import { getTriples } from "../util/comunica_utils";
 
 // all imports below are temporary as the data sources are currently read from a data file
 const N3 = require('n3');
@@ -11,9 +13,12 @@ const { once } = require('events');
 
 export class DataSource {
 
+    // general LDES client, shared across the different data sources
+    // FIXME
+    // private static readonly __ldes_client = newEngine();
     // the URL/location of the container root, which
     // is always polled at the required interval in case of an LDES
-    private __container_root_location: string
+    private readonly __container_root_location: string
     // LUT is set using `configureDataLayout` 
     // the keys are the short value for a given predicate,
     // the associated value with these keys is a tuple containing
@@ -22,20 +27,100 @@ export class DataSource {
     private __predicate_lut : any = {};
     private __predicate_count = 0;
     private __sorting_predicate_index : number | undefined;
-    private __data_buffer : DataEntry[] = new Array();
+    private __data_buffer : SimpleDataEntry[] = new Array();
     private __active_data_entry : [TripleEntry, [TripleEntry, TripleEntry | TripleEntry[]][]] | undefined;
+    private __container_bucket_locations = new Array<string>()
+    // options used with the LDES client for every container/data source
+    private static readonly __ldes_options = {
+        // for all options, see https://github.com/TREEcg/event-stream-client/tree/main/packages/actor-init-ldes-client
+        "representation": "Quads",
+        "emitMemberOnce": true,
+        "pollingInterval": 500,
+        "dereferenceMembers": false,
+        "mimeType": "text/turtle",
+        "loggingLevel": "warn"
+    };
 
-    constructor(location: string) {
+    constructor(location: string, type: "remote" | "local") {
         this.__container_root_location = location;
-        console.log(`Created a data source with external location ${this.__container_root_location}`)
-        // TODO schedule this when working with an LDES
+        console.log(`Created a data source with ${type} location ${this.__container_root_location}`)
+        this.__fetch = (type == "remote") ? this.__fetch_init_remote : this.__fetch_local;
+        // TODO schedule this when working with an LDES (either remote or local type, depends
+        // on the content of the container root wether or not this represents an LDES)
         this.__fetch();
     }
 
-    private async __fetch() {
-        // TODO: temporarily using just a file instead of getting actual pod data
-        // This code below (along its requirements) should no longer be required when
-        // shifted to querying LDES-compliant containers/sources
+    private __fetch = async () => {}
+    
+    private __fetch_init_remote = async () => {
+        getTriples(this.__container_root_location).then((data) => {
+            const entries = DataEntry.fromTriples(data);
+            for (const entry of entries) {
+                entry.print();
+            }
+        });
+        // console.log("Not implemented yet");
+        // const eventStream = DataSource.__ldes_client.createReadStream(
+        //     this.__container_root_location,
+        //     DataSource.__ldes_options
+        // );
+        // // TODO: maybe persistance through local state & file?
+        // eventStream.on('data', (member) => {
+        //     /* When using Quads representation, the members adhere to the [@Treecg/types Member interface](https://github.com/TREEcg/types/blob/main/lib/Member.ts) 
+        //         interface Member {
+        //             id: RDF.Term;
+        //             quads: Array<RDF.Quad>;
+        //         }
+        //     */
+        //     console.log("Data");
+        //     const memberURI = member.id.value;
+        //     console.log(memberURI);
+        //     const quads = member.quads;
+        //     console.log(quads);
+        // });
+        // eventStream.on('metadata', (data) => {
+        //     // the locations containing the UUIDs of the actual data all have the
+        //     // LDP container types associated with them, while not adhering to the TREE spec
+        //     // so only basic LDP containers are kept as destinations for regular data queries
+        //     // TODO: add ldp:inbox as queryable location
+        //     for (const [url, metadata] of data.treeMetadata.collections) {
+        //         // filtering out the metadata to only keep the pages representing
+        //         // ldp containers and not tree nodes
+        //         const types = metadata["@type"] as string[];
+        //         if (!anyIsObject(types, "tree:", "node") && anyIsObject(types, "ldp:", "container")) {
+        //             console.log(`Found page ${url}`);
+        //             this.__container_bucket_locations.push(url);
+        //         } else {
+        //             console.log(`Ignoring ${url}`);
+        //         }
+        //     }
+        // });
+        // eventStream.on('end', () => {
+        //     console.log("End");
+        //     console.log("No more data!");
+        // });
+        // // setting fetch to the schedule version, and calling it once so
+        // // buckets are fetched first
+        // this.__fetch = this.__fetch_schedule_remote;
+        // // arbitrary wait
+        // // FIXME while the eventStream."end" does not seem to function,
+        // // this arbitrary timeout can be improved
+        // setTimeout(this.__fetch, 500);
+        // // TODO schedule/repeat call if desired by the requester
+    }
+
+    private __fetch_schedule_remote = async () => {
+        // fetch everything still in the bucket location set
+        // remote version
+        while (this.__container_bucket_locations.length) {
+            const location = this.__container_bucket_locations.pop();
+            console.log(`Fetching location "${location}"`)
+        }
+    } 
+
+    private __fetch_local = async () => {
+        // TODO: detect local LDES streams instead of single file data streams (see fetch_remote)
+        // create a schedule version for bucket locations (see __fetch_schedule_remote)
         const streamParser = new N3.StreamParser();
         const rdfStream = fs.createReadStream(this.__container_root_location);
         const writer = stream.Writable({ objectMode: true });
@@ -57,7 +142,7 @@ export class DataSource {
         this.__insert_current_buffer();
     }
 
-    data() : DataEntry[] {
+    data() : SimpleDataEntry[] {
         return this.__data_buffer;
     }
 
@@ -120,7 +205,7 @@ export class DataSource {
             this.__process_data = this.__append_data_entry;
             // the existing `first sample` in firstSampleData
             // can already be added to the collection as well
-            this.__data_buffer.push(new DataEntry(
+            this.__data_buffer.push(new SimpleDataEntry(
                 initialSubject,
                 firstSampleData,
                 this.__sorting_predicate_index
@@ -151,7 +236,7 @@ export class DataSource {
                 this.__active_data_entry![1][predicateIndex] = [data.p, data.o];
             }
         } else {
-            // subject change, creating new DataEntry from temporary object
+            // subject change, creating new SimpleDataEntry from temporary object
             // TODO: use the sorting value (if available) to put this entry at the
             // correct position or sort after the fact
             this.__insert_current_buffer();
@@ -163,7 +248,7 @@ export class DataSource {
     }
 
     private __insert_current_buffer() {
-        this.__data_buffer.push(new DataEntry(
+        this.__data_buffer.push(new SimpleDataEntry(
             this.__active_data_entry![0],
             this.__active_data_entry![1],
             this.__sorting_predicate_index
@@ -178,7 +263,10 @@ export class DataSource {
         // as well as a boolean indicating an array (true) or not (false)
         // is required for storing the associated object(s)
         for (const [i, [property, array_required]] of properties.entries()) {
-            if (property.prefixIndex != -1 && property.value === prefixes[property.prefixIndex].sorting) {
+            if (property.prefix !== "<unknown>" && property.value === (prefixes as any)[property.prefix].sorting) {
+                // FIXME ignore it instead of asserting, check if another sortable
+                // property that is not an array is available, and if so,
+                // use that one instead
                 assert(!array_required, "Sortable data type is represented using an array (e.g. 2 values present for timestamp property), which is not supported.");
                 this.__sorting_predicate_index = i;
                 break;
