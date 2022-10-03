@@ -2,7 +2,9 @@
     "prefixes": {
         "ldes:": {
             "value": "https://w3id.org/ldes#",
-            "objects": {}
+            "objects": {
+                "stream": "EventStream"
+            }
         },
         "ldp:":{
             "value": "http://www.w3.org/ns/ldp#",
@@ -22,6 +24,9 @@
         },
         "rdf:": {
             "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "predicates": {
+                "type": "type"
+            },
             "objects": {}
         },
         "rdfs:": {

@@ -2,8 +2,8 @@ import { TripleEntry, Triple, DataEntry } from "../util/triple";
 import { SimpleDataEntry } from "../util/triple";
 import { prefixes } from "../prefixes.json";
 import { assert } from "console";
-import { anyIsObject, isObject, object } from "../util/prefix_util";
 import { getTriples } from "../util/comunica_utils";
+import { parseContainer, parseContainerRecursive } from "../util/container_utils";
 
 // all imports below are temporary as the data sources are currently read from a data file
 const N3 = require('n3');
@@ -29,7 +29,6 @@ export class DataSource {
     private __sorting_predicate_index : number | undefined;
     private __data_buffer : SimpleDataEntry[] = new Array();
     private __active_data_entry : [TripleEntry, [TripleEntry, TripleEntry | TripleEntry[]][]] | undefined;
-    private __container_bucket_locations = new Array<string>()
     // options used with the LDES client for every container/data source
     private static readonly __ldes_options = {
         // for all options, see https://github.com/TREEcg/event-stream-client/tree/main/packages/actor-init-ldes-client
@@ -53,70 +52,21 @@ export class DataSource {
     private __fetch = async () => {}
     
     private __fetch_init_remote = async () => {
-        getTriples(this.__container_root_location).then((data) => {
-            const entries = DataEntry.fromTriples(data);
-            for (const entry of entries) {
-                entry.print();
+        const locations = await parseContainerRecursive(this.__container_root_location);
+        if (locations) {
+            // processing has to happen in a serialized manner, as the processing pipeline
+            // uses subject change to segregate object properties
+            for (const location of locations) {
+                const triples = await getTriples(location);
+                for (const triple of triples) {
+                    this.__process_data(triple);
+                }
             }
-        });
-        // console.log("Not implemented yet");
-        // const eventStream = DataSource.__ldes_client.createReadStream(
-        //     this.__container_root_location,
-        //     DataSource.__ldes_options
-        // );
-        // // TODO: maybe persistance through local state & file?
-        // eventStream.on('data', (member) => {
-        //     /* When using Quads representation, the members adhere to the [@Treecg/types Member interface](https://github.com/TREEcg/types/blob/main/lib/Member.ts) 
-        //         interface Member {
-        //             id: RDF.Term;
-        //             quads: Array<RDF.Quad>;
-        //         }
-        //     */
-        //     console.log("Data");
-        //     const memberURI = member.id.value;
-        //     console.log(memberURI);
-        //     const quads = member.quads;
-        //     console.log(quads);
-        // });
-        // eventStream.on('metadata', (data) => {
-        //     // the locations containing the UUIDs of the actual data all have the
-        //     // LDP container types associated with them, while not adhering to the TREE spec
-        //     // so only basic LDP containers are kept as destinations for regular data queries
-        //     // TODO: add ldp:inbox as queryable location
-        //     for (const [url, metadata] of data.treeMetadata.collections) {
-        //         // filtering out the metadata to only keep the pages representing
-        //         // ldp containers and not tree nodes
-        //         const types = metadata["@type"] as string[];
-        //         if (!anyIsObject(types, "tree:", "node") && anyIsObject(types, "ldp:", "container")) {
-        //             console.log(`Found page ${url}`);
-        //             this.__container_bucket_locations.push(url);
-        //         } else {
-        //             console.log(`Ignoring ${url}`);
-        //         }
-        //     }
-        // });
-        // eventStream.on('end', () => {
-        //     console.log("End");
-        //     console.log("No more data!");
-        // });
-        // // setting fetch to the schedule version, and calling it once so
-        // // buckets are fetched first
-        // this.__fetch = this.__fetch_schedule_remote;
-        // // arbitrary wait
-        // // FIXME while the eventStream."end" does not seem to function,
-        // // this arbitrary timeout can be improved
-        // setTimeout(this.__fetch, 500);
-        // // TODO schedule/repeat call if desired by the requester
+        }
     }
 
-    private __fetch_schedule_remote = async () => {
-        // fetch everything still in the bucket location set
-        // remote version
-        while (this.__container_bucket_locations.length) {
-            const location = this.__container_bucket_locations.pop();
-            console.log(`Fetching location "${location}"`)
-        }
-    } 
+    // TODO: fetch_schedule_remote to regularly check the data (e.g. at ldp:inbox in
+    // case of an eventstream)
 
     private __fetch_local = async () => {
         // TODO: detect local LDES streams instead of single file data streams (see fetch_remote)

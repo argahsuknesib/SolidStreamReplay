@@ -68,8 +68,7 @@ export class TripleEntry {
         // corresponding predicate info to parse the object by
         // its type first, and as a regular entry otherwise
         value = value.trim();
-        const predPrefix = predicateInfo.prefix;
-        const specialPredicate: any = predPrefix === "<unknown>" ? undefined : (prefixes as any)[predPrefix]["predicates"];
+        const specialPredicate: any = (prefixes as any)[predicateInfo.prefix]["predicates"]?.[predicateInfo.value];
         if (specialPredicate) {
             const specialTypeInfo : any | undefined = specialPredicate[predicateInfo.value];
             if (specialTypeInfo) {
@@ -186,22 +185,40 @@ export class SimpleDataEntry {
 
 }
 
+// converting triples belonging to the same object to a more usable
+// version
+export interface RDFObject {
+    subj: TripleEntry
+    props: [TripleEntry, TripleEntry | RDFObject | (TripleEntry | RDFObject)[]][]
+
+    get(predicate: TripleEntry) : RDFPropertyValue | undefined;
+    print() : void;
+}
+
+export function isRDFObject(object: any) : object is RDFObject {
+    return "subj" in object && "props" in object;
+}
+
+// the property value type could now be any of the three possible types
+// therefore, a generic typename is specified
+export type RDFPropertyValue = TripleEntry | RDFObject | (TripleEntry | RDFObject)[]
+
 // type representing the properties a temporary/unnamed subject has
 // (for example a Tree#Relationship, an object that is typically temporary in name,
 // as only its properties are relevant)
-class UnnamedObj {
+export class UnnamedObj implements RDFObject {
 
-    // tag (= subj) as sometimes these values are also used
-    tag: TripleEntry | undefined
+    // subj; as sometimes these values are also used
+    subj: TripleEntry
     // the property values could either be regular types, or other unnamed objects
     props: [TripleEntry, TripleEntry | UnnamedObj | (TripleEntry | UnnamedObj)[]][]
 
     constructor(
         props: [TripleEntry, TripleEntry | UnnamedObj | (TripleEntry | UnnamedObj)[]][],
-        tag: TripleEntry | undefined = undefined
+        subj: TripleEntry
     ) {
         this.props = props;
-        this.tag = tag
+        this.subj = subj
     }
 
     static fromTriple(triple: Triple) : UnnamedObj {
@@ -241,7 +258,7 @@ class UnnamedObj {
     // this works recursively for the properties of unnamed objects,
     // so all levels get affected
     static __set_unnamed(
-        props: [TripleEntry, TripleEntry | UnnamedObj | (TripleEntry | UnnamedObj)[]][],
+        props: [TripleEntry, RDFPropertyValue][],
         tempSubject: string,
         value: UnnamedObj
     ) {
@@ -252,7 +269,7 @@ class UnnamedObj {
                 if (val.value === tempSubject) {
                     props[i][1] = value;
                 }
-            } else if (val instanceof UnnamedObj) {
+            } else if (isRDFObject(val)) {
                 // recursive operation
                 UnnamedObj.__set_unnamed(val.props, tempSubject, value);
             } else {
@@ -274,7 +291,7 @@ class UnnamedObj {
 
     // recursive print
     static __print(
-        props: [TripleEntry, TripleEntry | UnnamedObj | (TripleEntry | UnnamedObj)[]][],
+        props: [TripleEntry, RDFPropertyValue][],
         currentDepth: number = 0,
     ) {
         const printPrefix = ' ' + '  '.repeat(currentDepth);
@@ -284,8 +301,8 @@ class UnnamedObj {
             // }
             if (val instanceof TripleEntry) {
                 console.log(printPrefix + `${prop.get()} - ${val.get()}`);
-            } else if (val instanceof UnnamedObj) {
-                console.log(printPrefix + `${prop.get()} (${val.tag?.get()}) {`);
+            } else if (isRDFObject(val)) {
+                console.log(printPrefix + `${prop.get()} (${val.subj?.get()}) {`);
                 UnnamedObj.__print(val.props, currentDepth + 1);
                 console.log(printPrefix + "}");
             } else {
@@ -296,7 +313,7 @@ class UnnamedObj {
                         console.log(printPrefix + `  ${i}: '${subval.get()}'`);
                     } else {
                         // unnamed obj
-                        console.log(printPrefix + `  ${i} (${subval.tag?.get()}) {`)
+                        console.log(printPrefix + `  ${i} (${subval.subj?.get()}) {`)
                         UnnamedObj.__print(subval.props, currentDepth + 3);
                         console.log(printPrefix + '  }');
                     }        
@@ -306,20 +323,31 @@ class UnnamedObj {
         }
     }
 
+    get(predicate: TripleEntry) : RDFPropertyValue | undefined {
+        // linear search unfortunately
+        for (const [pred, val] of this.props) {
+            if (pred.equals(predicate)) {
+                return val;
+            }
+        }
+        return undefined;
+    }
+
+    print() {
+        console.log(`UnnamedObj - ${this.subj.get(true)}`);
+        UnnamedObj.__print(this.props);
+    }
+
 }
 
-// the property value type could now be any of the three possible types
-// therefore, a generic typename is specified
-type GeneralPropertyValue = TripleEntry | UnnamedObj | (TripleEntry | UnnamedObj)[]
-
-export class DataEntry {
+export class DataEntry implements RDFObject {
 
     subj: TripleEntry;
-    props : [TripleEntry, GeneralPropertyValue][]
+    props : [TripleEntry, RDFPropertyValue][]
 
     constructor(
         subj: TripleEntry,
-        props: [TripleEntry, GeneralPropertyValue][]
+        props: [TripleEntry, RDFPropertyValue][]
     ) {
         this.subj = subj;
         this.props = props;
@@ -416,6 +444,16 @@ export class DataEntry {
             }
         }
         return Array.from(result.values());
+    }
+
+    get(predicate: TripleEntry) : RDFPropertyValue | undefined {
+        // linear search unfortunately
+        for (const [pred, val] of this.props) {
+            if (pred.equals(predicate)) {
+                return val;
+            }
+        }
+        return undefined;
     }
 
 }

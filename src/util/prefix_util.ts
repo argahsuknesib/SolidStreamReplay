@@ -1,7 +1,9 @@
 import { prefixes } from "../prefixes.json"
-import { TripleEntry } from "./triple";
+import { isRDFObject, RDFObject, RDFPropertyValue, TripleEntry, UnnamedObj } from "./triple";
 
-export function object(
+export const RDFType = new TripleEntry("type", "rdf:");
+
+export function allObjects(
     key: keyof typeof prefixes,
     type: string,
     brief: boolean = false
@@ -20,12 +22,21 @@ export function object(
 }
 
 export function isObject(
-    value: string,
+    value: string | TripleEntry | RDFObject,
     key: keyof typeof prefixes,
     type: string
 ) : boolean {
-    const tripleEntry = TripleEntry.from_any(value);
+    if (isRDFObject(value)) {
+        // cannot be regular object if it is unnamed with custom
+        // properties, so not specified object
+        return false;
+    }
+    const tripleEntry = (value instanceof TripleEntry) ? value : TripleEntry.from_any(value);
     const typeInfo : string | string[] = (prefixes as any)[key]["objects"][type];
+    if (typeInfo == undefined) {
+        console.log(`Warning! The specified type \`${type}\` for prefix \`${key}\` does not exist in the \`prefixes.json\` file.`)
+        return false;
+    }
     if (tripleEntry.prefix !== key) {
         return false;
     }
@@ -42,13 +53,21 @@ export function isObject(
 }
 
 export function anyIsObject(
-    values: string[],
+    values: string | string[] | RDFPropertyValue,
     key: keyof typeof prefixes,
     type: string
 ) : boolean {
+    if (!(values instanceof Array)) {
+        return isObject(values, key, type);
+    }
     const typeInfo : string | string[] = (prefixes as any)[key]["objects"][type];
     for (const value of values) {
-        const tripleEntry = TripleEntry.from_any(value);
+        if (isRDFObject(value)) {
+            // cannot be regular object if it is unnamed with custom
+            // properties, so not specified object
+            continue;
+        }
+        const tripleEntry = (value instanceof TripleEntry) ? value : TripleEntry.from_any(value);
         if (tripleEntry.prefix !== key) {
             continue;
         }
