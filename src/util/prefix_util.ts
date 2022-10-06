@@ -1,7 +1,6 @@
 import { prefixes } from "../prefixes.json"
-import { isRDFObject, RDFObject, RDFPropertyValue, TripleEntry, UnnamedObj } from "./triple";
-
-export const RDFType = new TripleEntry("type", "rdf:");
+import { transforms } from "./transforms";
+import { isRDFObject, RDFObject, RDFPropertyValue, TripleEntry } from "./triple";
 
 export function allObjects(
     key: keyof typeof prefixes,
@@ -84,4 +83,23 @@ export function anyIsObject(
         }
     }
     return false;
+}
+
+// returns the transform lambda, its function and format (if any)
+export function reasonOnPredicate(
+    predicate: TripleEntry
+) : [((val: string, format: string) => any) | undefined, string | undefined, string | undefined] {
+    const info = (prefixes as any)[predicate.prefix]["predicates"]?.[predicate.value];
+    if (info) {
+        return [
+            transforms.get(info.function)!,
+            info.function,
+            info.format
+        ];
+    }
+    return [
+        undefined,
+        undefined,
+        undefined
+    ]
 }

@@ -28,11 +28,19 @@ export class DataManager {
     queryData(args: DataQueryArguments) : any {
         // returns `any` object with structure `subj1: { pred1: [obj1, obj2], pred2: obj3, ... }, ...`
         let result : any = {};
+        const databuffer = this.source.data()
+        if (databuffer.length == 0) {
+            const err = "The requested location has no data available (yet).";
+            return {
+                "@warning": {
+                    "NoData": err
+                }
+            };
+        }
         // if a timestamp is provided, the data is already sorted
         // so its only required to find the bounds inside this buffer
         // where the timestamp is in the requested timeframe
         let startIndex = 0;
-        const databuffer = this.source.data()
         let endIndex = databuffer.length - 1;
         if (databuffer[0]!.sortable()) {
             if (args.start) {
@@ -70,25 +78,32 @@ export class DataManager {
             });
         }
         if (args.pred) {
-            // TODO: apply the predicate filter on only one sample, so predicate indices
-            // are obtained instead, and using those indices as the filters instead
-
-            // here, entries are kept, but their properties
-            // are filtered upon
-            // the new data entries do not get their sorting
-            // index set, as this is no longer required (source array
-            // is already sorted)
-            const predicates = args.pred.map((original: string) => TripleEntry.from_any(original));
+            // the temporary use of the set makes the predicates distinct
+            // (except when used in both regular and brief notation, so that could be an issue)
+            const requestedPreds = [...new Set(args.pred)].map((original: string) => TripleEntry.from_any(original));
+            const existingPreds = subbuffer[0]!.props;
+            // boolean array (filter) converting all existing preds to only the requested ones
+            const resultingFilter = Array.from({ length: existingPreds.length } , () => (false));
+            // TODO: maybe do this on data_source level, or using the data_source
+            // predicate LUT instead, as using the first sample is not always possible
+            check_preds:
+            for (const rPred of requestedPreds) {
+                for (const [i, [ePred, _]] of existingPreds.entries()) {
+                    if (rPred.equals(ePred)) {
+                        resultingFilter[i] = true;
+                        continue check_preds;
+                    }
+                }
+                // if not all requested preds can be satisfied, the array becomes empty
+                subbuffer.length = 0;
+                break;
+            }
             subbuffer = subbuffer.map((data: SimpleDataEntry) => {
                 return new SimpleDataEntry(
                     data.subj,
-                    data.props.filter(
-                        ([prop, _]) => predicates.some(
-                            (predicate) => predicate.equals(prop)
-                        )
-                    )
+                    data.props.filter((_, i: number) => resultingFilter[i])
                 );
-            })
+            });
         }
         if (subbuffer.length == 0) {
             // no samples meet the requirement, adding warning to the result instead

@@ -1,9 +1,9 @@
-import { TripleEntry, Triple, DataEntry } from "../util/triple";
+import { TripleEntry, Triple } from "../util/triple";
 import { SimpleDataEntry } from "../util/triple";
 import { prefixes } from "../prefixes.json";
 import { assert } from "console";
-import { getTriples } from "../util/comunica_utils";
-import { parseContainer, parseContainerRecursive } from "../util/container_utils";
+import { LDES } from "../util/container_utils";
+import { SortedArray } from "../util/sorted_array";
 
 // all imports below are temporary as the data sources are currently read from a data file
 const N3 = require('n3');
@@ -27,46 +27,27 @@ export class DataSource {
     private __predicate_lut : any = {};
     private __predicate_count = 0;
     private __sorting_predicate_index : number | undefined;
-    private __data_buffer : SimpleDataEntry[] = new Array();
+    // private __data_buffer : SimpleDataEntry[] = new Array();
+    private __data_buffer = new SortedArray<SimpleDataEntry>();
     private __active_data_entry : [TripleEntry, [TripleEntry, TripleEntry | TripleEntry[]][]] | undefined;
-    // options used with the LDES client for every container/data source
-    private static readonly __ldes_options = {
-        // for all options, see https://github.com/TREEcg/event-stream-client/tree/main/packages/actor-init-ldes-client
-        "representation": "Quads",
-        "emitMemberOnce": true,
-        "pollingInterval": 500,
-        "dereferenceMembers": false,
-        "mimeType": "text/turtle",
-        "loggingLevel": "warn"
-    };
 
     constructor(location: string, type: "remote" | "local") {
         this.__container_root_location = location;
-        console.log(`Created a data source with ${type} location ${this.__container_root_location}`)
-        this.__fetch = (type == "remote") ? this.__fetch_init_remote : this.__fetch_local;
-        // TODO schedule this when working with an LDES (either remote or local type, depends
-        // on the content of the container root wether or not this represents an LDES)
-        this.__fetch();
-    }
-
-    private __fetch = async () => {}
-    
-    private __fetch_init_remote = async () => {
-        const locations = await parseContainerRecursive(this.__container_root_location);
-        if (locations) {
-            // processing has to happen in a serialized manner, as the processing pipeline
-            // uses subject change to segregate object properties
-            for (const location of locations) {
-                const triples = await getTriples(location);
-                for (const triple of triples) {
-                    this.__process_data(triple);
-                }
-            }
+        console.log(`Created a data source with ${type} location ${this.__container_root_location}`);
+        if (type == "remote") {
+            this.__fetch_remote()
+        } else {
+            this.__fetch_local();
         }
     }
 
-    // TODO: fetch_schedule_remote to regularly check the data (e.g. at ldp:inbox in
-    // case of an eventstream)
+    private __fetch_remote = async () => {
+        LDES.subscribe(this.__container_root_location, (triples) => {
+            for (const triple of triples) {
+                this.__process_data(triple);
+            }
+        }).then((clients) => clients[0].start());
+    }
 
     private __fetch_local = async () => {
         // TODO: detect local LDES streams instead of single file data streams (see fetch_remote)
@@ -93,7 +74,7 @@ export class DataSource {
     }
 
     data() : SimpleDataEntry[] {
-        return this.__data_buffer;
+        return this.__data_buffer.data();
     }
 
     // this function `pointer` changes 3 times, so be careful when applying changes

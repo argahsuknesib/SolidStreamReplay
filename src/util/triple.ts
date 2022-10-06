@@ -1,6 +1,7 @@
 import assert from "assert";
 import { prefixes } from "../prefixes.json";
-import { transforms } from "./transforms";
+import { reasonOnPredicate } from "./prefix_util";
+import { Comparable } from "./sorted_array";
 
 export class TripleEntry {
     // Represents an entry found for either subj, pred or obj
@@ -63,25 +64,20 @@ export class TripleEntry {
         return new TripleEntry(value, "<unknown>");
     }
 
-    static from_object(value: string, predicateInfo: TripleEntry, brief: boolean = false) {
+    static from_object(value: string, predicateType: TripleEntry, brief: boolean = false) {
         // the same method as regular from(), but takes extra
         // corresponding predicate info to parse the object by
         // its type first, and as a regular entry otherwise
         value = value.trim();
-        const specialPredicate: any = (prefixes as any)[predicateInfo.prefix]["predicates"]?.[predicateInfo.value];
-        if (specialPredicate) {
-            const specialTypeInfo : any | undefined = specialPredicate[predicateInfo.value];
-            if (specialTypeInfo) {
-                const transform = transforms.get(specialTypeInfo.function);
-                if (transform) {
-                    const result = new TripleEntry(value, "<unknown>");
-                    result.reasonedValue = transform(value, specialTypeInfo["format"]);
-                    result.function = specialTypeInfo.function;
-                    return result;
-                } else {
-                    console.warn(`Unrecognized transform type in data: '${specialTypeInfo.function}'`)
-                }
-            }
+        const [transform, func, format] = reasonOnPredicate(predicateType);
+        if (transform) {
+            // value is reasoned on directly, so no prefix
+            const result = new TripleEntry(value, "<unknown>");
+            result.reasonedValue = transform(value, format!);
+            result.function = func;
+            return result;
+        } else if (func) {
+            console.log(`Unsupported transform type \`${func}\`.`);
         }
         // predicate info was not useful, using regular approach
         return this.from(value, brief);
@@ -155,7 +151,7 @@ export class Triple {
     }
 }
 
-export class SimpleDataEntry {
+export class SimpleDataEntry implements Comparable {
     
     subj : TripleEntry;
     props : [TripleEntry, TripleEntry | TripleEntry[]][]
@@ -177,6 +173,30 @@ export class SimpleDataEntry {
                 this.props[sortingPredicateIndex][1] as TripleEntry
             ).reasonedValue;
         }
+    }
+
+    cmp(other: SimpleDataEntry) : number {
+        // returns equals (= 0) when sorting val is undefined
+        if (this.sorting_val && other.sorting_val) {
+            return this.sorting_val - other.sorting_val;
+        }
+        return 0;
+    }
+
+    equals(other: SimpleDataEntry) : boolean {
+        return this.cmp(other) == 0
+            && this.subj.equals(other.subj)
+            && this.props.every(([pred, val], i) => {
+                return pred.equals(other.props[i][0]) && (
+                    (val instanceof Array
+                        && val.every((val, j) => {
+                            return val.equals((other.props[i][1] as TripleEntry[])[j]);
+                        })
+                    ) || (
+                        val instanceof TripleEntry
+                        && val.equals(other.props[i][1] as TripleEntry)
+                    ))
+            })
     }
 
     sortable() : boolean {
